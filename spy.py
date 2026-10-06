@@ -5,8 +5,21 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from jobspy import scrape_jobs
 
+ 
+COLUMN_WIDTHS = {
+    "title": 34,
+    "company": 28,
+    "description": 60,
+    "job_url": 52,
+    "job_url_direct": 52,
+    "location": 24,
+}
+
+
 search_terms = [
-    "software engineer",
+    "software engineer New Grad",
+    "software engineer I",
+    "software engineer 1",
     "software engineer intern",
     "software engineer co-op",
 ]
@@ -19,7 +32,7 @@ for term in search_terms:
         search_term=term,
         location="Miami, FL",
         results_wanted=20,
-        hours_old=72,
+        hours_old=24,
         country_indeed="USA",
         fetch_description=True,
         verbose=1,
@@ -48,7 +61,6 @@ workbook = load_workbook("jobs.xlsx")
 worksheet = workbook.active
 worksheet.title = "Job Results"
 worksheet.freeze_panes = "A2"
-worksheet.auto_filter.ref = worksheet.dimensions
 
 header_fill = PatternFill("solid", fgColor="1F4E78")
 header_font = Font(color="FFFFFF", bold=True)
@@ -58,20 +70,12 @@ for cell in worksheet[1]:
     cell.font = header_font
     cell.alignment = Alignment(horizontal="center", vertical="center")
 
-column_widths = {
-    "title": 34,
-    "company": 28,
-    "description": 60,
-    "job_url": 52,
-    "job_url_direct": 52,
-    "location": 24,
-}
-
-for column_index, column_cells in enumerate(worksheet.columns, start=1):
+for column_cells in worksheet.columns:
     column_name = column_cells[0].value
     letter = column_cells[0].column_letter
-    width = column_widths.get(column_name, 16)
-    worksheet.column_dimensions[letter].width = width
+    worksheet.column_dimensions[letter].width = COLUMN_WIDTHS.get(
+        column_name, 16
+    )
 
     for cell in column_cells[1:]:
         cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -83,7 +87,7 @@ for column_index, column_cells in enumerate(worksheet.columns, start=1):
 for row in worksheet.iter_rows(min_row=2):
     worksheet.row_dimensions[row[0].row].height = 48
 
-if worksheet.max_row > 1:
+if worksheet.max_row > 1 and worksheet.max_column > 0:
     table = Table(displayName="JobResults", ref=worksheet.dimensions)
     table.tableStyleInfo = TableStyleInfo(
         name="TableStyleMedium2",

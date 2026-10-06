@@ -8,3 +8,10 @@
 *.pyc
 .env
 dist
+jobs.csv
+jobs.csv
+jobs.xlsx
+jobs_readable.xlsx
+*.xlsx
+~$jobs_readable.xlsx
+~$jobs_readable.xlsx

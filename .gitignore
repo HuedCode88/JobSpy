@@ -15,3 +15,5 @@ jobs_readable.xlsx
 *.xlsx
 ~$jobs_readable.xlsx
 ~$jobs_readable.xlsx
+jobs_readable.xlsx
+~$jobs_readable.xlsx

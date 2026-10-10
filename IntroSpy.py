@@ -17,11 +17,11 @@ COLUMN_WIDTHS = {
 
 
 search_terms = [
-    "software engineer New Grad",
-    "software engineer I",
-    "software engineer 1",
-    "software engineer intern",
-    "software engineer co-op"
+    "Junior Software Engineer",
+    "Associate Software Engineer",
+    "New grad Software Engineer",
+    "Coding Tutor", 
+    "Programming Tutor"
 ]
 
 results = []

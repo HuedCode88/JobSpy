@@ -5,6 +5,7 @@ import random
 import re
 import time
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
@@ -47,6 +48,9 @@ class LinkedIn(Scraper):
     delay = 3
     band_delay = 4
     jobs_per_page = 25
+    max_rate_limit_retries = 3
+    proxy_quarantine_seconds = 60
+    max_backoff_seconds = 60
 
     def __init__(
         self, proxies: list[str] | str | None = None, ca_cert: str | None = None, user_agent: str | None = None
@@ -111,10 +115,7 @@ class LinkedIn(Scraper):
 
             params = {k: v for k, v in params.items() if v is not None}
             try:
-                response = self.session.get(
-                    f"{self.base_url}/jobs-guest/jobs/api/seeMoreJobPostings/search?",
-                    params=params,
-                )
+                response = self._request_with_rate_limit_handling(params)
                 if response.status_code != 200:
                     log.error(f"LinkedIn response status code {response.status_code}")
                     break
@@ -153,6 +154,79 @@ class LinkedIn(Scraper):
 
         job_list = job_list[: scraper_input.results_wanted]
         return JobResponse(jobs=job_list)
+
+    def _request_with_rate_limit_handling(self, params):
+        url = f"{self.base_url}/jobs-guest/jobs/api/seeMoreJobPostings/search?"
+        for attempt in range(self.max_rate_limit_retries + 1):
+            try:
+                response = self.session.get(url, params=params)
+            except RuntimeError as exc:
+                if "quarantined" not in str(exc):
+                    raise
+                wait = self.session.seconds_until_next_proxy()
+                log.warning(
+                    "LinkedIn proxies are temporarily quarantined; "
+                    f"waiting {wait:.1f}s before retrying"
+                )
+                time.sleep(wait)
+                continue
+
+            if response.status_code != 429:
+                return response
+
+            retry_after = self._retry_after_seconds(response)
+            backoff = min(
+                2**attempt,
+                self.max_backoff_seconds,
+            )
+            wait = max(retry_after or 0, backoff)
+            if self.session.has_proxies:
+                self.session.quarantine_current_proxy(
+                    self.proxy_quarantine_seconds
+                )
+                log.warning(
+                    "LinkedIn returned 429; quarantining the current proxy "
+                    f"for {self.proxy_quarantine_seconds}s and retrying in {wait}s"
+                )
+            else:
+                log.warning(
+                    "LinkedIn returned 429 without configured proxies; "
+                    f"this may be a global/IP block, retrying in {wait}s"
+                )
+            if attempt < self.max_rate_limit_retries:
+                time.sleep(wait)
+
+        if self.session.has_proxies:
+            log.error(
+                "LinkedIn remained rate-limited after retries; "
+                "the configured proxies may be blocked or exhausted"
+            )
+        else:
+            log.error(
+                "LinkedIn remained rate-limited after retries without proxies; "
+                "this appears to be a global/IP-level block"
+            )
+        return response
+
+    @staticmethod
+    def _retry_after_seconds(response) -> int | None:
+        value = response.headers.get("Retry-After")
+        if not value:
+            return None
+        try:
+            return max(0, int(value))
+        except ValueError:
+            try:
+                retry_at = parsedate_to_datetime(value)
+                return max(
+                    0,
+                    int(
+                        (retry_at - datetime.now(retry_at.tzinfo)).total_seconds()
+                    ),
+                )
+            except (TypeError, ValueError, OverflowError):
+                log.warning("LinkedIn sent an invalid Retry-After header: %r", value)
+                return None
 
     def _process_job(
         self, job_card: Tag, job_id: str, full_descr: bool

@@ -180,6 +180,19 @@ Naukri searches India. `location` takes a city, e.g. `"Pune"`.
 * LinkedIn is the most restrictive and usually rate limits around the 10th page with one ip. Proxies are a must basically.
 * Glassdoor rate limits after about 30 requests per ip, which `fetch_description` reaches quickly.
 
+### LinkedIn rate limits
+
+LinkedIn `429` responses are retried with exponential backoff. If the response
+includes a `Retry-After` header, its value is honored. When multiple proxies
+are configured, the proxy that received the `429` is temporarily quarantined
+for 60 seconds and another configured proxy is tried. Without proxies, repeated
+`429` responses are reported as a likely IP-level/global block; retries cannot
+change the originating IP.
+
+The LinkedIn scraper retries rate-limited requests up to three times. Keep
+request volumes low and use `fetch_description=True` only when needed, since
+each description requires an additional request.y.
+
 ## Frequently Asked Questions
 
 **Q: Why is Indeed giving unrelated roles?**  

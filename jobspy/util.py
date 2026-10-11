@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from itertools import cycle
 
 import requests
@@ -28,16 +29,14 @@ class RotatingProxySession:
     request_timeout = 15
 
     def __init__(self, proxies=None):
+        self._proxy_quarantine = {}
         if isinstance(proxies, str):
-            self.proxy_cycle = cycle([self.format_proxy(proxies)])
+            self._proxy_list = [self.format_proxy(proxies)]
         elif isinstance(proxies, list):
-            self.proxy_cycle = (
-                cycle([self.format_proxy(proxy) for proxy in proxies])
-                if proxies
-                else None
-            )
+            self._proxy_list = [self.format_proxy(proxy) for proxy in proxies]
         else:
-            self.proxy_cycle = None
+            self._proxy_list = []
+        self.proxy_cycle = cycle(self._proxy_list) if self._proxy_list else None
 
     @staticmethod
     def format_proxy(proxy):
@@ -48,10 +47,37 @@ class RotatingProxySession:
 
     def request(self, method, url, **kwargs):
         if self.proxy_cycle:
-            proxy = next(self.proxy_cycle)
+            proxy = self._next_available_proxy()
+            if proxy is None:
+                raise RuntimeError("All configured proxies are temporarily quarantined")
             self.proxies = {} if proxy["http"] == "http://localhost" else proxy
+            self.current_proxy = proxy
+        else:
+            self.current_proxy = None
         kwargs.setdefault("timeout", self.request_timeout)
         return super().request(method, url, **kwargs)
+
+    def _next_available_proxy(self):
+        for _ in range(len(self._proxy_list)):
+            proxy = next(self.proxy_cycle)
+            if self._proxy_quarantine.get(proxy["http"], 0) <= time.monotonic():
+                return proxy
+        return None
+
+    def quarantine_current_proxy(self, duration: float):
+        if self.current_proxy is not None:
+            self._proxy_quarantine[self.current_proxy["http"]] = (
+                time.monotonic() + duration
+            )
+
+    @property
+    def has_proxies(self):
+        return bool(self._proxy_list)
+
+    def seconds_until_next_proxy(self):
+        if not self._proxy_quarantine:
+            return 0
+        return max(0, min(self._proxy_quarantine.values()) - time.monotonic())
 
 
 class RequestsRotating(RotatingProxySession, requests.Session):

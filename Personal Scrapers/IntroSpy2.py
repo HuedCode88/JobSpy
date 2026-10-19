@@ -17,7 +17,7 @@ COLUMN_WIDTHS = {
 
 
 search_terms = [
-    "Entry Level Software Engineer",
+    "Entry Level Software Engineer"
 ]
 
 results = []

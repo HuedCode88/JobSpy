@@ -17,11 +17,10 @@ COLUMN_WIDTHS = {
 
 
 search_terms = [
+    "Entry Level Software Engineer",
     "Junior Software Engineer",
     "Associate Software Engineer",
     "New grad Software Engineer",
-    "Coding Tutor", 
-    "Programming Tutor"
 ]
 
 results = []
@@ -32,7 +31,7 @@ for term in search_terms:
         search_term=term,
         location="Miami, FL",
         results_wanted=20,
-        hours_old=24,
+        hours_old=72,
         country_indeed="USA",
         fetch_description=True,
         verbose=1,

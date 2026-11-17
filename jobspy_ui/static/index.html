@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobSpy Console</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">J</span> JobSpy Console</div>
+    <div id="banner" class="banner hidden"></div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-actions">
+        <button id="btn-new" class="btn primary block">+ New search</button>
+        <button id="btn-import" class="btn block">Import from script…</button>
+      </div>
+      <div id="profile-list" class="profile-list"></div>
+    </aside>
+
+    <main id="main" class="main">
+      <div class="empty">Select a search on the left, or create a new one.</div>
+    </main>
+  </div>
+
+  <!-- job detail drawer -->
+  <div id="drawer" class="drawer hidden">
+    <div class="drawer-head">
+      <div><div id="drawer-title" class="drawer-title"></div><div id="drawer-sub" class="muted"></div></div>
+      <button id="drawer-close" class="btn ghost">✕</button>
+    </div>
+    <div id="drawer-meta" class="drawer-meta"></div>
+    <pre id="drawer-desc" class="drawer-desc"></pre>
+  </div>
+
+  <!-- import dialog -->
+  <dialog id="import-dialog">
+    <h3>Import from a script</h3>
+    <p class="muted">Paste one of your existing scripts. Nothing is executed — the app only reads the
+      <code>search_terms</code> list and the <code>scrape_jobs(...)</code> arguments.</p>
+    <textarea id="import-source" rows="14" spellcheck="false" placeholder="Paste Python here…"></textarea>
+    <div id="import-warnings" class="muted"></div>
+    <div class="dialog-actions">
+      <button id="import-cancel" class="btn">Cancel</button>
+      <button id="import-go" class="btn primary">Create search from script</button>
+    </div>
+  </dialog>
+
+  <!-- settings form template (filled by app.js using .value, never innerHTML) -->
+  <template id="tpl-form">
+    <form class="form" autocomplete="off">
+      <div class="grid2">
+        <label>Name<input name="name" required maxlength="80"></label>
+        <label>Description <span class="muted">(optional)</span><input name="description" maxlength="200"></label>
+      </div>
+
+      <label>Search terms <span class="muted">one per line — each is searched separately</span>
+        <textarea name="search_terms" rows="6" spellcheck="false"></textarea>
+      </label>
+
+      <fieldset><legend>Job boards</legend><div id="site-chips" class="chips"></div></fieldset>
+
+      <div class="grid4">
+        <label>Location<input name="location" placeholder="Miami, FL"></label>
+        <label>Country <span class="muted">(Indeed/Glassdoor)</span><select name="country_indeed"></select></label>
+        <label>Results per board<input type="number" name="results_wanted" min="1" max="1000"></label>
+        <label>Posted within (hours)<input type="number" name="hours_old" min="1" placeholder="any">
+          <span class="presets" data-target="hours_old">
+            <a data-v="24">24h</a><a data-v="72">3d</a><a data-v="168">7d</a><a data-v="720">30d</a><a data-v="">any</a>
+          </span></label>
+      </div>
+
+      <div class="grid4">
+        <label>Job type<select name="job_type"><option value="">Any</option></select></label>
+        <label>Distance (miles)<input type="number" name="distance" min="1" max="500"></label>
+        <label class="check"><input type="checkbox" name="is_remote"> Remote only</label>
+        <label class="check"><input type="checkbox" name="fetch_description"> Fetch full descriptions <span class="muted">(slower)</span></label>
+      </div>
+
+      <label class="check"><input type="checkbox" name="only_new">
+        Only export jobs I haven't seen in earlier runs of this search</label>
+
+      <details class="advanced">
+        <summary>Advanced</summary>
+        <div class="grid4">
+          <label>Description format<select name="description_format"></select></label>
+          <label class="check"><input type="checkbox" name="easy_apply"> Easy apply only</label>
+          <label class="check"><input type="checkbox" name="enforce_annual_salary"> Convert pay to annual</label>
+        </div>
+        <label>Proxies <span class="muted">one per line: user:pass@host:port</span>
+          <textarea name="proxies" rows="3" spellcheck="false"></textarea></label>
+      </details>
+
+      <details class="advanced schedule">
+        <summary>Schedule <span class="pill">coming soon</span></summary>
+        <div class="grid4">
+          <label class="check"><input type="checkbox" name="schedule_enabled" disabled> Run automatically</label>
+          <label>Cron expression<input name="schedule_cron" placeholder="0 7 * * *" disabled></label>
+        </div>
+        <p class="muted">Stored now so the data model is ready; not acted on until the scheduler is added.</p>
+      </details>
+
+      <div id="form-error" class="form-error hidden"></div>
+      <div class="form-actions">
+        <button type="submit" class="btn primary">Save</button>
+        <button type="button" id="form-duplicate" class="btn">Duplicate</button>
+        <button type="button" id="form-delete" class="btn danger">Delete</button>
+      </div>
+    </form>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

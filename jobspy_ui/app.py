@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import json
 import shutil
+import socket
 import sqlite3
 import sys
 import threading
 import webbrowser
 from pathlib import Path
+
+import psutil
 
 from flask import Flask, abort, jsonify, request, send_from_directory
 
@@ -27,6 +30,41 @@ STATIC_DIR = (
 )
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 app.json.sort_keys = False
+
+
+def _process_matches_port_owner(process: "psutil.Process", frozen: bool) -> bool:
+    name = process.name().lower()
+    if frozen:
+        if name in ("jobspyconsole.exe", "jobspyconsole"):
+            return True
+        if name not in ("python.exe", "python"):
+            return False
+        try:
+            command = " ".join(process.cmdline()).lower().replace("\\", "/")
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+        return "jobspy_ui/app.py" in command
+    return name in ("jobspyconsole.exe", "jobspyconsole")
+
+
+def _stop_port_owner(port: int, frozen: bool) -> bool:
+    for connection in psutil.net_connections(kind="tcp"):
+        if (
+            connection.status == psutil.CONN_LISTEN
+            and connection.laddr
+            and connection.laddr.port == port
+            and connection.pid
+        ):
+            try:
+                process = psutil.Process(connection.pid)
+                if not _process_matches_port_owner(process, frozen):
+                    return False
+                process.terminate()
+                process.wait(timeout=5)
+                return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                return False
+    return False
 
 
 # ---------- helpers ----------
@@ -251,6 +289,28 @@ def download(rid, fmt):
 
 
 if __name__ == "__main__":
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind(("127.0.0.1", 5000))
+    except OSError as exc:
+        probe.close()
+        frozen = getattr(sys, "frozen", False)
+        if not _stop_port_owner(5000, frozen):
+            raise SystemExit(
+                "Cannot start JobSpy on port 5000 because another process is already using it.\n"
+                "Close that application or stop the process on port 5000, then try again."
+            ) from exc
+        stopped_name = "source app" if frozen else "JobSpyConsole.exe"
+        print(f"Stopped existing {stopped_name} on port 5000.")
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            probe.bind(("127.0.0.1", 5000))
+        except OSError:
+            raise SystemExit("Port 5000 is still occupied after stopping the compatible app.") from exc
+    finally:
+        if probe.fileno() != -1:
+            probe.close()
+
     db.init_db()
     runner.start()
     threading.Timer(1.0, lambda: webbrowser.open("http://127.0.0.1:5000")).start()

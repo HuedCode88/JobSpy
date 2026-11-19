@@ -17,6 +17,11 @@ The UI imports the local `jobspy` package from this repository, so it always use
 same scraper code as the personal scripts. The optional `requirements.txt` file is
 for installing the UI's direct runtime, test, and packaging dependencies separately.
 
+Running `python jobspy_ui\app.py` starts the development UI and does not launch or
+depend on the `.exe`. It scans `Personal Scrapers\` at startup and adds each importable
+script as a profile. The packaged executable also bundles these scraper scripts and
+adds them to its own local SQLite database on first startup.
+
 To build a Windows executable:
 
 ```powershell

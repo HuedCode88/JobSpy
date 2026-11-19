@@ -95,20 +95,34 @@ def init_db():
             "WHERE status IN ('queued','running')",
             (now(),),
         )
-        if c.execute("SELECT COUNT(*) FROM profiles").fetchone()[0] == 0:
-            from config import DEFAULT_CONFIG
+        seeds: list[tuple[str, str, dict]] = []
 
-            seed = {
-                **DEFAULT_CONFIG,
-                "search_terms": [
-                    "Frontend Engineer 1", "Backend Engineer 1", "Web Developer 1",
-                    "Python Engineer", "Part Time Programmer", "Contract Programmer",
-                ],
-                "location": "Miami, FL",
-            }
-            t = now()
-            c.execute(
-                "INSERT INTO profiles (name, description, config, created_at, updated_at) VALUES (?,?,?,?,?)",
-                ("Miami Dev Jobs (example)", "Seeded from the original script. Edit or delete me.",
-                 json.dumps(seed), t, t),
-            )
+        if not getattr(sys, "frozen", False):
+            from config import DEFAULT_CONFIG, validate_config
+            from importer import import_script
+
+            scrapers_dir = Path(__file__).resolve().parent.parent / "Personal Scrapers"
+            if scrapers_dir.exists():
+                for scraper in sorted(scrapers_dir.glob("*.py")):
+                    if scraper.name == "__init__.py":
+                        continue
+                    try:
+                        imported = import_script(scraper.read_text(encoding="utf-8"))
+                        seed = validate_config({**DEFAULT_CONFIG, **imported["config"]})
+                        seeds.append((
+                            scraper.stem,
+                            f"Imported from Personal Scrapers/{scraper.name}",
+                            seed,
+                        ))
+                    except (OSError, UnicodeDecodeError, ValueError) as exc:
+                        print(f"Could not import {scraper.name}: {exc}")
+
+        for name, description, seed in seeds:
+            existing = c.execute("SELECT id FROM profiles WHERE name=?", (name,)).fetchone()
+            if existing is None:
+                t = now()
+                c.execute(
+                    "INSERT INTO profiles (name, description, config, created_at, updated_at) "
+                    "VALUES (?,?,?,?,?)",
+                    (name, description, json.dumps(seed), t, t),
+                )

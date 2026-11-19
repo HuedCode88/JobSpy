@@ -100,5 +100,20 @@ def test_flow():
     print("OK")
 
 
+def test_remote_listing_filter():
+    from runner import _remote_listing_mask
+
+    df = pd.DataFrame([
+        {"title": "Remote Python Engineer", "location": "USA", "description": "Fully remote", "is_remote": True},
+        {"title": "Python Engineer", "location": "Miami, FL", "description": "Work onsite in Miami", "is_remote": False},
+        {"title": "Hybrid Python Engineer", "location": "Miami, FL", "description": "Two days hybrid", "is_remote": True},
+        {"title": "Backend Engineer", "location": "Remote - US", "description": "Work from home", "is_remote": False},
+        {"title": "Developer", "location": "Miami, FL", "description": "In-office role", "is_remote": True},
+    ])
+
+    mask = _remote_listing_mask(df)
+    assert mask.tolist() == [True, False, False, True, False]
+
+
 if __name__ == "__main__":
     test_flow()

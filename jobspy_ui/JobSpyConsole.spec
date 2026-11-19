@@ -3,12 +3,20 @@ from pathlib import Path
 
 ROOT = Path(SPECPATH).parent
 
+# The executable gets JobSpy's Python modules through hiddenimports below.
+# It must not receive the source directory as external application data.
+JOBSPY_SOURCE = ROOT / "jobspy"
+if not JOBSPY_SOURCE.is_dir():
+    raise SystemExit("JobSpy source is missing from the build environment")
+
 
 a = Analysis(
     [str(ROOT / "jobspy_ui" / "app.py")],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=[(str(ROOT / "jobspy_ui" / "static"), "static")],
+    datas=[
+        (str(ROOT / "jobspy_ui" / "static"), "static"),
+    ],
     hiddenimports=[
         "jobspy",
         "jobspy.model",

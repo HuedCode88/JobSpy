@@ -47,6 +47,43 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "profile"
 
 
+def _remote_listing_mask(df: pd.DataFrame) -> pd.Series:
+    """Use board-independent text checks to remove hybrid or in-person listings."""
+    if df.empty:
+        return pd.Series(dtype=bool)
+
+    text_columns = [
+        column
+        for column in ("title", "location", "description", "job_type", "listing_type")
+        if column in df.columns
+    ]
+    text = (
+        df[text_columns].fillna("").astype(str).agg(" ".join, axis=1).str.lower()
+        if text_columns
+        else pd.Series("", index=df.index, dtype=str)
+    )
+
+    positive = text.str.contains(
+        r"\b(?:remote|work from home|wfh)\b",
+        regex=True,
+        na=False,
+    )
+    explicit_negative = text.str.contains(
+        r"\b(?:hybrid|on[\s-]?site|in[\s-]?person|in[\s-]?office|not remote|no remote|non[\s-]?remote)\b",
+        regex=True,
+        na=False,
+    )
+
+    if "is_remote" in df.columns:
+        metadata_remote = df["is_remote"].map(
+            lambda value: value is True
+            or (isinstance(value, str) and value.lower() in ("true", "yes", "1"))
+        )
+    else:
+        metadata_remote = pd.Series(False, index=df.index)
+    return (metadata_remote & ~explicit_negative) | (positive & ~explicit_negative)
+
+
 def _scrape_term(cfg: dict, term: str, log) -> pd.DataFrame:
     """Scrape one term. scrape_jobs() raises if ANY board errors, discarding the others' results,
     so on failure we retry board-by-board and keep whatever works."""
@@ -171,6 +208,12 @@ class Runner:
                     df = pd.DataFrame()
                 if df is not None and not df.empty:
                     df = df.copy()
+                    if cfg["is_remote"]:
+                        before_remote_filter = len(df)
+                        df = df[_remote_listing_mask(df)].reset_index(drop=True)
+                        removed = before_remote_filter - len(df)
+                        if removed:
+                            log(f"  -> removed {removed} non-remote or hybrid listings")
                     df["search_term"] = term
                     frames.append(df)
                 log(f"  -> {0 if df is None else len(df)} rows")
